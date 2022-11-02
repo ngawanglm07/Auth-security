@@ -1,11 +1,12 @@
 //jshint esversion:6
+require('dotenv').config();
 const express =  require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
-const encrypt = require("mongoose-encryption");
-
-
+const passport = require("passport");
+const session = require("express-session");
+const passportLocalMongoose = require("passport-local-mongoose");
 
 const app = express();
 
@@ -15,55 +16,70 @@ app.use(bodyParser.urlencoded({
     extended:true
 }));
 
-const secrets = "this is a little secret";
+app.use(session({
+    secret:"this is a sec",
+    resave: false,
+    saveUninitialized:false
+}));
 
-
+app.use(passport.initialize());
+app.use(passport.session());
 
 mongoose.connect("mongodb://localhost:27017/userrDB",{useNewUrlParser:true});
-
-
 const userSchema = new mongoose.Schema({
     email:String,
     password:String
 })
 
-userSchema.plugin(encrypt,{secret:secrets , encryptedFields:["password"]});
+userSchema.plugin(passportLocalMongoose);
 const User = new mongoose.model("User",userSchema);
 
 
-app.post("/register",function(req,res){
-    const  newUser = new User ({
-        email: req.body.username,
-        password: req.body.password
-    });
 
-    newUser.save(function(err){
-        if(err){
-            console.log(err);
-        } else{
-            res.render("secrets");
-        }
-    });
+
+passport.use(User.createStrategy());
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
+
+
+
+// userSchema.plugin(encrypt,{secret:secrets , encryptedFields:["password"]});
+
+
+
+
+app.post("/register",function(req,res){
+    
+ User.register({username:req.body.username},req.body.password , function(err,user){
+    if(err){
+        console.log(err);
+    } else{
+        passport.authenticate("local")(req,res,function(){
+            res.redirect("/secrets");
+        })
+    }
+ })
+
+
 });
 
 app.post("/login",function(req,res){
-    const username = req.body.username;
-    const password = req.body.password;
+  
 
-    User.findOne({email:username},function(err,foundUser){
-        if(err){
-            console.log(err);
-        } else{
-            if(foundUser){
-                if(foundUser.password === password){
-                 res.redirect("/secrets");
-                } else {
-                    res.redirect("/register");
-                }
-            }
-        }
-    })
+
+
+
 });
+
+app.get("/secrets",function(req,res){
+
+    if(req.isAuthenticated()){
+        res.render("secrets");
+    } else{
+        res.redirect("/login");
+    }
+    
+})
 
 app.get("/",function(req,res){
     res.render("home");
