@@ -98,6 +98,15 @@ app.get("/",function(req,res){
 app.get("/login",function(req,res){
     res.render("login");
 })
+
+app.get('/logout', function(req, res, next) {
+    req.logout(function(err) {
+      if (err) { return next(err); }
+      res.redirect('/');
+    });
+});
+
+
 app.get("/register",function(req,res){
     res.render("register");
 })
